@@ -51,7 +51,8 @@ def train_model():
     y = torch.tensor(y, dtype=torch.float32).to(device)
 
     dataset = TensorDataset(X, y)
-    dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=128,
+                            shuffle=True, num_workers=4)
 
     input_size = 4
     hidden_size = 64
