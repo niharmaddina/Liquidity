@@ -52,7 +52,7 @@ def train_model():
 
     dataset = TensorDataset(X, y)
     dataloader = DataLoader(dataset, batch_size=128,
-                            shuffle=True, num_workers=4)
+                            shuffle=True, num_workers=0)
 
     input_size = 4
     hidden_size = 64
