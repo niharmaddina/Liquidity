@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pandas
+numpy
+torch
+torchdiffeq
+yfinance
+scikit-learn
+python-multipart
