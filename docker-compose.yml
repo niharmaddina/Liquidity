@@ -1,3 +1,4 @@
+# docker-compose.yml
 version: '3'
 services:
   backend:
@@ -12,7 +13,3 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app
-  redis:
-    image: "redis:alpine"
-    ports:
-      - "6379:6379"
