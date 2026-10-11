@@ -74,7 +74,7 @@ cd frontend && npm install && npm start
 ## State of the code (updated 2026-10-11)
 
 The 2024 prototype had three defects that stopped the backend from working from a fresh clone, all
-fixed in the October 2025 commit:
+fixed in the October 2026 commit:
 
 - the committed `lnn_ode_model.pth` was an empty file; it is now real weights from `train_model.py`
   (50 epochs on AAPL, final training MSE 0.00078 in standardised units) with the fitted scalers in
