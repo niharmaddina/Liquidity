@@ -1,5 +1,6 @@
 # backend/model_inference.py
 import torch
+import joblib
 from model_definition import LNN_ODE_Model
 
 def load_model(model_path):
@@ -11,9 +12,13 @@ def load_model(model_path):
     model.eval()
     return model
 
-def make_prediction(model, data):
-    input_tensor = torch.tensor(data, dtype=torch.float32)
+def load_scalers(path='scalers.joblib'):
+    return joblib.load(path)
+
+
+def make_prediction(model, data, scalers):
+    """`data` is one raw feature row (1 x 4); returns the predicted next-day close in price units."""
+    x = torch.tensor(scalers['X'].transform(data), dtype=torch.float32)
     with torch.no_grad():
-        output = model(input_tensor)
-    prediction = output.item()
-    return prediction
+        output = model(x).numpy()
+    return float(scalers['y'].inverse_transform(output)[0, 0])

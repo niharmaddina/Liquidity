@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from model_definition import LNN_ODE_Model
-from data_processing import get_historical_data
+from data_processing import get_historical_data, add_features, FEATURES
+import joblib
 import logging
 import time
 
@@ -22,14 +23,9 @@ def train_model():
     logging.info(f"Training on: {device}")
 
     symbol = 'AAPL'
-    data = get_historical_data(symbol)
+    data = add_features(get_historical_data(symbol))
 
-    data['MA20'] = data['Close'].rolling(window=20).mean()
-    data['MA50'] = data['Close'].rolling(window=50).mean()
-    data['Return'] = data['Close'].pct_change()
-    data.dropna(inplace=True)
-
-    features = data[['Close', 'MA20', 'MA50', 'Return']].values
+    features = data[FEATURES].values
     targets = data['Close'].shift(-1).dropna().values
     features = features[:-1]  # Align features and targets
 
@@ -86,11 +82,12 @@ def train_model():
                     f"Epoch {epoch+1}/{epochs}, Batch {batch_idx}, Loss: {loss.item():.6f}")
 
         end_time = time.time()
-        logging.info(f"Epoch {epoch+1}/{epochs}, Average Loss: {epoch_loss /
-                                                                len(dataloader):.6f}, Time: {end_time - start_time:.2f}s")
+        avg_loss = epoch_loss / len(dataloader)
+        logging.info(f"Epoch {epoch+1}/{epochs}, Average Loss: {avg_loss:.6f}, Time: {end_time - start_time:.2f}s")
 
-        torch.save(model.state_dict(), 'lnn_ode_model.pth')
-        logging.info("Model training complete and saved.")
+    torch.save(model.state_dict(), 'lnn_ode_model.pth')
+    joblib.dump({'X': scaler_X, 'y': scaler_y}, 'scalers.joblib')
+    logging.info("Model training complete; saved lnn_ode_model.pth and scalers.joblib.")
 
 
 if __name__ == '__main__':

@@ -6,4 +6,6 @@ torch
 torchdiffeq
 yfinance
 scikit-learn
+joblib
 python-multipart
+websockets

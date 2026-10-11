@@ -3,8 +3,8 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 
-from data_processing import get_latest_data, get_historical_data, preprocess_data
-from model_inference import load_model, make_prediction
+from data_processing import get_historical_data, latest_feature_row
+from model_inference import load_model, load_scalers, make_prediction
 
 app = FastAPI()
 
@@ -24,32 +24,29 @@ app.add_middleware(
 
 # Load the model
 model = load_model('lnn_ode_model.pth')
+scalers = load_scalers('scalers.joblib')
 
 # Global variables
 symbol = 'AAPL'  # Default stock symbol
 interval = 60     # Interval in seconds for real-time updates
 
 @app.get('/historical-data')
-async def historical_data():
+async def historical_data(symbol: str = symbol):
     data = get_historical_data(symbol)
     return data.to_dict(orient='records')
 
 @app.get('/predict')
-async def predict():
-    data = get_latest_data(symbol)
-    preprocessed_data = preprocess_data(data)
-    prediction = make_prediction(model, preprocessed_data)
-    return {'prediction': prediction}
+async def predict(symbol: str = symbol):
+    prediction = make_prediction(model, latest_feature_row(symbol), scalers)
+    return {'symbol': symbol, 'predicted_next_close': prediction}
 
 @app.websocket('/ws/predictions')
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     while True:
         try:
-            data = get_latest_data(symbol)
-            preprocessed_data = preprocess_data(data)
-            prediction = make_prediction(model, preprocessed_data)
-            await websocket.send_json({'prediction': prediction})
+            prediction = make_prediction(model, latest_feature_row(symbol), scalers)
+            await websocket.send_json({'symbol': symbol, 'predicted_next_close': prediction})
             await asyncio.sleep(interval)
         except Exception as e:
             print(f"Error: {e}")
