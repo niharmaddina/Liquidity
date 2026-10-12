@@ -1,12 +1,35 @@
 # backend/train_model.py
+"""Train the LNN+ODE model on daily AAPL bars and save weights plus scalers.
+
+    python train_model.py                 # 50 epochs on cached AAPL data (downloads once)
+    python train_model.py --refresh       # re-download first
+    python train_model.py --epochs 1 --out-dir /tmp/smoke
+
+`fit_model` is the reusable training loop; `evaluate.py` calls it for the walk-forward test.
+"""
+import argparse
+import logging
+import os
+import random
+import time
+
+import joblib
+import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader, TensorDataset
+
+from data_processing import FEATURES, load_daily, supervised_frame
 from model_definition import LNN_ODE_Model
-from data_processing import get_historical_data, add_features, FEATURES
-import joblib
-import logging
-import time
+
+HIDDEN_SIZE = 64
+
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 
 def initialize_weights(model):
@@ -17,78 +40,75 @@ def initialize_weights(model):
                 nn.init.zeros_(m.bias)
 
 
-def train_model():
-    logging.basicConfig(level=logging.INFO)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logging.info(f"Training on: {device}")
+def fit_model(X, y, seed=0, epochs=50, hidden_size=HIDDEN_SIZE, batch_size=128, lr=1e-3,
+              weight_decay=1e-4, device=None, log=None):
+    """Fit StandardScalers on (X, y) and train the model on the scaled data.
 
-    symbol = 'AAPL'
-    data = add_features(get_historical_data(symbol))
+    X: (n, 4) raw feature rows, y: (n,) raw next-day closes. Returns (model, scalers) with
+    scalers = {'X': StandardScaler, 'y': StandardScaler}; the model is left in eval mode on CPU.
+    The scalers are fitted on exactly the rows passed in, so callers control what is "seen".
+    """
+    set_seed(seed)
+    device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    scaler_X, scaler_y = StandardScaler(), StandardScaler()
+    Xs = torch.tensor(scaler_X.fit_transform(np.asarray(X, dtype=np.float64)), dtype=torch.float32)
+    ys = torch.tensor(scaler_y.fit_transform(np.asarray(y, dtype=np.float64).reshape(-1, 1)),
+                      dtype=torch.float32)
+    loader = DataLoader(TensorDataset(Xs.to(device), ys.to(device)), batch_size=batch_size,
+                        shuffle=True, num_workers=0,
+                        generator=torch.Generator().manual_seed(seed))
 
-    features = data[FEATURES].values
-    targets = data['Close'].shift(-1).dropna().values
-    features = features[:-1]  # Align features and targets
-
-    # Convert to tensors
-    X = torch.tensor(features, dtype=torch.float32)
-    y = torch.tensor(targets, dtype=torch.float32).unsqueeze(
-        1)  # Add dimension
-
-    # Normalize features and targets
-    from sklearn.preprocessing import StandardScaler
-    scaler_X = StandardScaler()
-    scaler_y = StandardScaler()
-
-    X = scaler_X.fit_transform(X)
-    y = scaler_y.fit_transform(y)
-
-    # Convert back to tensors and move to device
-    X = torch.tensor(X, dtype=torch.float32).to(device)
-    y = torch.tensor(y, dtype=torch.float32).to(device)
-
-    dataset = TensorDataset(X, y)
-    dataloader = DataLoader(dataset, batch_size=128,
-                            shuffle=True, num_workers=0)
-
-    input_size = 4
-    hidden_size = 64
-    output_size = 1
-    model = LNN_ODE_Model(input_size, hidden_size, output_size).to(device)
-
+    model = LNN_ODE_Model(X.shape[1], hidden_size, 1).to(device)
     initialize_weights(model)
-
     criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=0.001, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-    epochs = 50
     for epoch in range(epochs):
         model.train()
-        epoch_loss = 0.0
-        start_time = time.time()
-
-        for batch_idx, (batch_X, batch_y) in enumerate(dataloader):
-            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+        epoch_loss, start = 0.0, time.time()
+        for batch_X, batch_y in loader:
             optimizer.zero_grad()
-            outputs = model(batch_X)
-            loss = criterion(outputs, batch_y)
+            loss = criterion(model(batch_X), batch_y)
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
+        if log:
+            log(f'Epoch {epoch + 1}/{epochs}, Average Loss: {epoch_loss / len(loader):.6f}, '
+                f'Time: {time.time() - start:.2f}s')
+    model.eval()
+    return model.cpu(), {'X': scaler_X, 'y': scaler_y}
 
-            # Log every 10 batches
-            if batch_idx % 10 == 0:
-                logging.info(
-                    f"Epoch {epoch+1}/{epochs}, Batch {batch_idx}, Loss: {loss.item():.6f}")
 
-        end_time = time.time()
-        avg_loss = epoch_loss / len(dataloader)
-        logging.info(f"Epoch {epoch+1}/{epochs}, Average Loss: {avg_loss:.6f}, Time: {end_time - start_time:.2f}s")
+def predict(model, scalers, X):
+    """Next-day close in price units for each raw feature row in X (n, 4)."""
+    xs = torch.tensor(scalers['X'].transform(np.asarray(X, dtype=np.float64)), dtype=torch.float32)
+    with torch.no_grad():
+        out = model(xs).numpy()
+    return scalers['y'].inverse_transform(out)[:, 0]
 
-    torch.save(model.state_dict(), 'lnn_ode_model.pth')
-    joblib.dump({'X': scaler_X, 'y': scaler_y}, 'scalers.joblib')
-    logging.info("Model training complete; saved lnn_ode_model.pth and scalers.joblib.")
+
+def train_model(symbol='AAPL', epochs=50, seed=0, out_dir='.', refresh=False):
+    logging.basicConfig(level=logging.INFO)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logging.info(f'Training on: {device}')
+
+    sf = supervised_frame(load_daily(symbol, refresh=refresh))
+    logging.info(f'{symbol}: {len(sf)} rows, {sf.Date.iloc[0].date()} to {sf.Date.iloc[-1].date()}')
+    model, scalers = fit_model(sf[FEATURES].values, sf['Target'].values, seed=seed,
+                               epochs=epochs, device=device, log=logging.info)
+
+    os.makedirs(out_dir, exist_ok=True)
+    torch.save(model.state_dict(), os.path.join(out_dir, 'lnn_ode_model.pth'))
+    joblib.dump(scalers, os.path.join(out_dir, 'scalers.joblib'))
+    logging.info(f'Model training complete; saved lnn_ode_model.pth and scalers.joblib in {out_dir}.')
 
 
 if __name__ == '__main__':
-    train_model()
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument('--symbol', default='AAPL')
+    p.add_argument('--epochs', type=int, default=50)
+    p.add_argument('--seed', type=int, default=0)
+    p.add_argument('--out-dir', default='.', help='where to write lnn_ode_model.pth and scalers.joblib')
+    p.add_argument('--refresh', action='store_true', help='re-download the daily bars instead of using data/')
+    a = p.parse_args()
+    train_model(a.symbol, a.epochs, a.seed, a.out_dir, a.refresh)

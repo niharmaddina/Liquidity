@@ -1,11 +1,13 @@
-fastapi
-uvicorn[standard]
-pandas
-numpy
-torch
-torchdiffeq
-yfinance
-scikit-learn
-joblib
-python-multipart
-websockets
+# Pinned to the versions the 2026-10-12 evaluation ran with (Python 3.11).
+# For a CPU-only torch wheel install it first from the PyTorch index, as .github/workflows/tests.yml does.
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+websockets==17.2
+pandas==3.0.6
+numpy==2.4.6
+torch==2.14.1
+torchdiffeq==0.2.5
+yfinance==1.7.0
+scikit-learn==1.9.1
+joblib==1.6.0
+matplotlib==3.11.2

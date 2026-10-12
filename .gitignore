@@ -7,3 +7,6 @@ venv/
 build/
 .DS_Store
 .ipynb_checkpoints/
+
+# cached market data (see backend/data_processing.py:load_daily)
+data/
