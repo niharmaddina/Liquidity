@@ -59,7 +59,8 @@ def directional_accuracy(prev_close, actual, pred):
     """Share of days where sign(pred - prev_close) == sign(actual - prev_close).
 
     A forecast that never moves away from today's close (persistence) makes no directional
-    call, so the result is NaN rather than 0."""
+    call, so the result is NaN rather than 0. A day on which the actual close does not move
+    counts as a miss for any forecast that does (3 of the 2008 test days in results/)."""
     prev_close, actual, pred = (np.asarray(a, float) for a in (prev_close, actual, pred))
     pred_dir = np.sign(pred - prev_close)
     if np.all(pred_dir == 0):
@@ -355,7 +356,9 @@ def main():
             json.dump(meta, f, indent=2)
         log(f'{ticker}: saved {pred_path}')
 
-    pred = pd.concat(frames, ignore_index=True)
+    # Build the tables from the CSV just written (forecasts rounded to 4 decimals), not from the
+    # in-memory floats, so that `--report-only` reproduces walk_forward.csv exactly from predictions.csv.
+    pred = pd.read_csv(pred_path, parse_dates=['Date', 'TargetDate'])
     table = write_outputs(pred, meta, out_dir)
     print(table[['ticker', 'label', 'rmse', 'rmse_pct', 'mae', 'dir_acc']].to_string(index=False))
 

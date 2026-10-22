@@ -79,9 +79,11 @@ parentheses so the tickers are comparable:
 
 What the numbers show:
 
-- Persistence has the lowest RMSE on all four tickers. The fixed LNN+ODE model is 1.2x (TSLA)
-  to 4.1x (SPY) worse. Refitting every quarter brings it to 1.3x to 1.6x worse, roughly the level
-  of the 5-day moving average, and on TSLA refitting made it slightly worse than the fixed model.
+- Persistence and the linear regression tie for the lowest RMSE on all four tickers (they are
+  within 0.015 USD of each other; the regression is nominally ahead on TSLA and MSFT, by less than
+  0.005 USD). The fixed LNN+ODE model is 1.2x (TSLA) to 4.1x (SPY) worse than persistence.
+  Refitting every quarter brings it to 1.3x to 1.6x worse, roughly the level of the 5-day moving
+  average, and on TSLA refitting made it slightly worse than the fixed model.
 - The linear regression on the same four features matches persistence to within 0.02 USD on
   every ticker: with today's close among the inputs, least squares learns to copy it, and that
   copy is all the forecastable signal these features carry.
@@ -91,8 +93,11 @@ What the numbers show:
 - The model's error is mostly a negative bias. The fixed model under-predicts by 3.17 USD (AAPL)
   to 10.80 USD (MSFT) on average, and the error grows once prices move above the range the
   weights and scalers saw in training; in the figure below the AAPL error jumps from June 2024
-  onwards. Refitting shrinks the bias (to 1.55 to 2.95 USD) but does not remove it. MAE ranks the
-  methods the same way.
+  onwards. Refitting shrinks the bias (to 1.55 to 2.95 USD) but does not remove it. MAE gives the same
+  conclusion: on every ticker both LNN+ODE variants have a higher MAE than persistence and both
+  linear regressions. The only rank changes between the two metrics are among persistence and the
+  two regressions, which differ by hundredths of a dollar, and between the refit model and the
+  5-day moving average on AAPL.
 
 So on next-day close the model does not beat persistence, does not beat a four-feature linear
 regression, and shows no directional skill in this test. The notebook's RMSE and R squared were

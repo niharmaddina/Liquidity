@@ -1,4 +1,4 @@
-# Pinned to the versions the 2026-10-12 evaluation ran with (Python 3.11).
+# Pinned to the versions the 2026-10-22 evaluation in results/ ran with (Python 3.11).
 # For a CPU-only torch wheel install it first from the PyTorch index, as .github/workflows/tests.yml does.
 fastapi==0.143.0
 uvicorn[standard]==0.54.0

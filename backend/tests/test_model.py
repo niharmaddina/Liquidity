@@ -1,4 +1,6 @@
 """Unit tests for the model, feature builder, scalers and evaluation metrics. No network access."""
+import os
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -161,3 +163,26 @@ def test_metrics_table_matches_direct_computation():
     assert np.isnan(t.loc['persistence', 'dir_acc'])
     assert t.loc['lnn_fixed', 'rmse'] == 0.0 and t.loc['lnn_fixed', 'dir_acc'] == 1.0
     assert t.loc['lnn_fixed', 'up_share'] == pytest.approx(3 / 5)
+
+
+# ---------------------------------------------------------------- committed results
+
+RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'results')
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(RESULTS, 'predictions.csv')), reason='results/ not present')
+def test_committed_walk_forward_table_matches_predictions():
+    """results/walk_forward.csv must be what metrics_table gives on results/predictions.csv, and the
+    per-day file must have persistence == today's close and the target == the next row's close."""
+    pred = pd.read_csv(os.path.join(RESULTS, 'predictions.csv'), parse_dates=['Date', 'TargetDate'])
+    table = pd.read_csv(os.path.join(RESULTS, 'walk_forward.csv'))
+    recomputed = metrics_table(pred)
+    assert len(table) == len(recomputed) > 0
+    for col in ['ticker', 'method', 'n']:
+        assert list(table[col]) == list(recomputed[col]), col
+    for col in ['mean_price', 'rmse', 'rmse_pct', 'mae', 'dir_acc', 'bias', 'up_share']:
+        assert np.allclose(table[col], recomputed[col], atol=1e-5, equal_nan=True), col
+    assert (pred['persistence'] == pred['Close']).all()
+    for _, g in pred.groupby('Ticker'):
+        assert np.allclose(g['Actual'].to_numpy()[:-1], g['Close'].to_numpy()[1:])
+        assert (g['TargetDate'] > g['Date']).all()
