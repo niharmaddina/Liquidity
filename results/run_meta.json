@@ -1,0 +1,60 @@
+{
+  "run_date_utc": "2026-10-22 01:46",
+  "command": "python evaluate.py",
+  "train_end": "2022-12-31",
+  "test_start": "2023-01-03",
+  "test_end": "2024-12-31",
+  "refit_every": 63,
+  "seed": 0,
+  "epochs": 50,
+  "hidden_size": 64,
+  "torch": "2.14.1",
+  "device": "cpu (arm64)",
+  "figure_ticker": "AAPL",
+  "data": {
+    "AAPL": {
+      "symbol": "AAPL",
+      "downloaded_at_utc": "2026-10-22T01:46:17Z",
+      "rows": 4226,
+      "first": "2010-01-04",
+      "last": "2026-10-21",
+      "auto_adjust": true,
+      "train_rows": 3222,
+      "test_rows": 502
+    },
+    "TSLA": {
+      "symbol": "TSLA",
+      "downloaded_at_utc": "2026-10-22T01:46:20Z",
+      "rows": 4104,
+      "first": "2010-06-29",
+      "last": "2026-10-21",
+      "auto_adjust": true,
+      "train_rows": 3100,
+      "test_rows": 502
+    },
+    "MSFT": {
+      "symbol": "MSFT",
+      "downloaded_at_utc": "2026-10-22T01:46:22Z",
+      "rows": 4226,
+      "first": "2010-01-04",
+      "last": "2026-10-21",
+      "auto_adjust": true,
+      "train_rows": 3222,
+      "test_rows": 502
+    },
+    "SPY": {
+      "symbol": "SPY",
+      "downloaded_at_utc": "2026-10-22T01:46:25Z",
+      "rows": 4226,
+      "first": "2010-01-04",
+      "last": "2026-10-21",
+      "auto_adjust": true,
+      "train_rows": 3222,
+      "test_rows": 502
+    }
+  },
+  "n_test": 502,
+  "n_refits": 7,
+  "data_start": "2010-03-16",
+  "data_downloaded_utc": "2026-10-22"
+}
